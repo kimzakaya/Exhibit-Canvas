@@ -54,6 +54,14 @@
                     <div class="control-section">
                         <h3>액자 추가</h3>
                         <div class="control-group">
+                            <label>액자 이름</label>
+                            <input type="text" id="frameName" placeholder="예: 작품1, 서울전경" maxlength="30">
+                        </div>
+                        <div class="control-group"> <!-- 수정: 이미지 업로드 입력 추가 -->
+                            <label>액자 사진 선택 (선택사항)</label>
+                            <input type="file" id="frameImage" accept="image/*">
+                        </div>
+                        <div class="control-group">
                             <label>액자 너비 (cm)</label>
                             <input type="number" id="frameWidth" value="60" min="10" max="200">
                         </div>
@@ -63,6 +71,11 @@
                         </div>
                         <button class="button button-primary" onclick="addFrame()">액자 추가</button>
                         <button class="button button-secondary" onclick="clearAllFrames()">액자 전체 삭제</button>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>레이어 (액자 목록)</h3>
+                        <div id="frameLayerList" class="layer-list"></div>
                     </div>
 
                     <div class="control-section">
@@ -122,11 +135,10 @@
                     <div class="info-panel">
                         <h3>💡 사용법</h3>
                         <div class="info-item">• 벽을 드래그하여 배치</div>
-                        <div class="info-item">• 벽을 클릭하여 선택</div>
+                        <div class="info-item">• 벽을 우클릭하여 메뉴 표시</div>
                         <div class="info-item">• 회전 핸들로 각도 조정</div>
-                        <div class="info-item">• 스페이스바 + 드래그로 캔버스 이동 </div>
-                        <div class="info-item">• alt + 마우스 휠로 캔버스 확대 및 축소</div>
-                        <div class="info-item">• X 버튼으로 삭제</div>
+                        <div class="info-item">• 스페이스바 + 드래그로 캔버스 이동</div>
+                        <div class="info-item">• Alt + 마우스 휠로 확대/축소</div>
                     </div>
                 </div>
 
@@ -138,6 +150,26 @@
                         <button class="zoom-btn" onclick="zoomFloorPlan(0.1)">+</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 컨텍스트 메뉴 -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="editWall()">✏️ 벽 수정</div>
+        <div class="context-menu-item" onclick="viewWallStructure()">👁️ 벽 구조 확인</div>
+        <div class="context-menu-item context-menu-delete" onclick="deleteWallFromContext()">🗑️ 벽 삭제</div>
+    </div>
+
+    <!-- 벽 구조 확인 팝업 -->
+    <div id="wallStructurePopup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2 id="popupWallName">벽 구조</h2>
+                <button class="popup-close" onclick="closeWallStructurePopup()">×</button>
+            </div>
+            <div class="popup-content">
+                <div id="popupWall" class="popup-wall"></div>
             </div>
         </div>
     </div>

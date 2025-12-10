@@ -29,6 +29,9 @@ let panStartY = 0;
 let panningWorkspace = null;
 let spacePressed = false;
 
+// 수정: 컨텍스트 메뉴 관련 전역 변수 추가
+let contextMenuTarget = null;
+
 // ==================== 탭 전환 ====================
 function switchTab(tabId) {
     // 모든 탭 비활성화
@@ -81,12 +84,16 @@ function createOrUpdateWall() {
             width: parseFloat(frame.style.width) / scale,
             height: parseFloat(frame.style.height) / scale,
             left: parseFloat(frame.style.left),
-            top: parseFloat(frame.style.top)
+            top: parseFloat(frame.style.top),
+            image: frame.dataset.image || null // 수정: 이미지 데이터 저장
         }))
     };
     
     currentWallId = wallId;
     updateWallSelect();
+    updateWall(); // 수정: 요구1 - 벽 저장 후 즉시 업데이트
+    updateInfo(); // 수정: 요구1 - 정보 업데이트
+    updateWallList(); // 수정: 요구2 - 평면도 목록 즉시 업데이트
     alert(`"${wallName}" 벽이 저장되었습니다!`);
 }
 
@@ -116,7 +123,8 @@ function switchWall() {
         document.getElementById('wallWidth').value = 400;
         document.getElementById('wallHeight').value = 300;
         clearAllFrames();
-        updateWall();
+        updateWall(); // 수정: 요구1 - 새 벽 시 업데이트
+        updateInfo();
         return;
     }
     
@@ -131,10 +139,11 @@ function switchWall() {
     // 액자 복원
     clearAllFrames();
     wall.frames.forEach(frameData => {
-        addFrameWithData(frameData);
+        addFrameWithData(frameData); // 수정: 이미지 포함 복원
     });
     
-    updateWall();
+    updateWall(); // 수정: 요구1 - 전환 시 업데이트
+    updateInfo();
 }
 
 function deleteCurrentWall() {
@@ -151,6 +160,8 @@ function deleteCurrentWall() {
         clearAllFrames();
         updateWallSelect();
         updateWall();
+        updateInfo(); // 수정: 요구1 - 삭제 후 업데이트
+        updateWallList(); // 수정: 요구2 - 목록 업데이트
     }
 }
 
@@ -164,7 +175,7 @@ function updateWall() {
     wall.style.height = (height * scale) + 'px';
     
     document.getElementById('wallSize').textContent = width + ' × ' + height + ' cm';
-    updateInfo();
+    updateInfo(); // 수정: 요구1 - 항상 정보 업데이트
 }
 
 function toggleGrid() {
@@ -180,9 +191,126 @@ function toggleGrid() {
 
 // ==================== 액자 관리 ====================
 function addFrame() {
-    const width = document.getElementById('frameWidth').value;
-    const height = document.getElementById('frameHeight').value;
-    addFrameWithData({ width, height, left: 10, top: 10 });
+    const nameInput = document.getElementById("frameName");
+    const imageInput = document.getElementById("frameImage");
+    const width = parseInt(document.getElementById("frameWidth").value);
+    const height = parseInt(document.getElementById("frameHeight").value);
+
+    // 이름이 없으면 기본 이름 생성
+    const frameName = nameInput.value.trim() || `액자 ${frames.length + 1}`;
+    nameInput.value = "";
+
+    const frame = document.createElement("div");
+    frame.className = "frame";
+    frame.style.width = (width * scale) + "px";
+    frame.style.height = (height * scale) + "px";
+
+    // 마우스 호버 시 표시될 정보
+    frame.title = `${frameName} / ${width} × ${height} cm`;
+
+    // 프레임 ID
+    const id = Date.now();
+    frame.dataset.id = id;
+
+    // 초기 위치
+    frame.style.left = "20px";
+    frame.style.top = "20px";
+
+    // 드래그/이동 기능 유지
+    addFrameEvents(frame);
+
+    // 벽 위에 추가
+    document.getElementById("wall").appendChild(frame);
+    frames.push(frame);
+
+    // 레이어 목록에 추가
+    addFrameLayerItem(id, frameName, width, height);
+
+    // 수정: 이미지 업로드 및 크롭 처리
+    if (imageInput.files && imageInput.files[0]) {
+        const file = imageInput.files[0];
+        if (!file.type.startsWith('image/')) {
+            alert('이미지 파일만 업로드 가능합니다.');
+            imageInput.value = ""; // 입력 초기화
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) { // 5MB 제한 (옵션: 메모리 보호)
+            alert('5MB 이하의 이미지만 업로드해주세요.');
+            imageInput.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const frameAspectRatio = width / height; // 액자 비율
+                
+                // Canvas로 자동 중앙 크롭
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                let outputWidth = img.width;
+                let outputHeight = img.height;
+                const imgAspectRatio = img.width / img.height;
+                
+                if (imgAspectRatio > frameAspectRatio) {
+                    // 사진이 액자보다 넓음: 높이 맞추고 가로 크롭
+                    outputWidth = img.height * frameAspectRatio;
+                } else if (imgAspectRatio < frameAspectRatio) {
+                    // 사진이 액자보다 좁음: 가로 맞추고 세로 크롭
+                    outputHeight = img.width / frameAspectRatio;
+                }
+                
+                canvas.width = width * scale; // 실제 액자 픽셀 크기
+                canvas.height = height * scale;
+                
+                const outputX = (outputWidth - img.width) * 0.5;
+                const outputY = (outputHeight - img.height) * 0.5;
+                
+                // 크롭된 이미지 그리기 (중앙 중심)
+                ctx.drawImage(img, outputX, outputY, outputWidth, outputHeight, 0, 0, canvas.width, canvas.height);
+                
+                // 크롭된 이미지를 base64로 변환 (JPEG 압축 80%로 파일 크기 줄임)
+                const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                
+                frame.style.backgroundImage = `url(${croppedDataUrl})`;
+                frame.style.backgroundSize = 'cover';  // CSS로 최종 맞춤
+                frame.style.backgroundPosition = 'center';
+                frame.dataset.image = croppedDataUrl;  // 프로젝트 저장용 base64
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        imageInput.value = ""; // 입력 초기화
+    }
+
+    updateInfo(); // 기존: 정보 업데이트
+}
+
+function addFrameLayerItem(id, name, width, height) {
+    const list = document.getElementById("frameLayerList");
+
+    const item = document.createElement("div");
+    item.className = "layer-item";
+    item.dataset.id = id;
+
+    item.innerHTML = `
+        <span class="layer-name">${name}</span>
+        <span class="layer-size">${width}×${height}</span>
+    `;
+
+    // 클릭하면 해당 액자 선택
+    item.onclick = () => {
+        const frame = document.querySelector(`.frame[data-id='${id}']`);
+        if (frame) {
+            frame.scrollIntoView({ behavior: "smooth", block: "center" });
+            frame.style.outline = "3px solid #3498db";
+            setTimeout(() => (frame.style.outline = "none"), 1000);
+        }
+    };
+
+    list.appendChild(item);
 }
 
 function addFrameWithData(frameData) {
@@ -194,6 +322,11 @@ function addFrameWithData(frameData) {
     frame.style.height = (frameData.height * scale) + 'px';
     frame.style.left = frameData.left + 'px';
     frame.style.top = frameData.top + 'px';
+    if (frameData.image) { // 수정: 요구4 - 이미지 복원
+        frame.style.backgroundImage = `url(${frameData.image})`;
+        frame.style.backgroundSize = 'cover';
+        frame.dataset.image = frameData.image;
+    }
     frame.innerHTML = `
         <span>${frameData.width} × ${frameData.height} cm</span>
         <div class="frame-delete" onclick="deleteFrame(event, this.parentElement)">×</div>
@@ -205,6 +338,7 @@ function addFrameWithData(frameData) {
     wall.appendChild(frame);
     frames.push(frame);
     updateInfo();
+    updateFrameLayerList();
 }
 
 function startDrag(e) {
@@ -238,6 +372,7 @@ function deleteFrame(e, frame) {
         selectedFrame = null;
     }
     updateInfo();
+    updateFrameLayerList(); // 수정: 레이어 업데이트
 }
 
 function clearAllFrames() {
@@ -245,6 +380,7 @@ function clearAllFrames() {
     frames = [];
     selectedFrame = null;
     updateInfo();
+    updateFrameLayerList();
 }
 
 function updateInfo() {
@@ -410,7 +546,7 @@ function saveProject() {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Exhibit Canvas - exhibition-project-${Date.now()}.json`;  // 수정: prefix 추가
+    a.download = `Exhibit Canvas - exhibition-project-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -662,6 +798,24 @@ document.addEventListener('DOMContentLoaded', () => {
         tab.style.display = 'none';  // inline으로 초기 숨김
     });
     document.getElementById('initial-screen').style.display = 'flex';
+
+    // 수정: 요구3 - 평면도 캔버스에 우클릭 이벤트 추가
+    const floorPlanCanvas = document.getElementById('floorPlanCanvas');
+    floorPlanCanvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (e.target.classList.contains('floor-wall') || e.target.parentElement.classList.contains('floor-wall')) {
+            contextMenuTarget = e.target.closest('.floor-wall');
+            const menu = document.getElementById('contextMenu');
+            menu.style.left = `${e.pageX}px`;
+            menu.style.top = `${e.pageY}px`;
+            menu.classList.add('active');
+        }
+    });
+
+    // 컨텍스트 메뉴 외 클릭 시 숨김
+    document.addEventListener('click', () => {
+        document.getElementById('contextMenu').classList.remove('active');
+    });
 });
 
 function startNewProject() {
@@ -673,4 +827,151 @@ function startNewProject() {
 
 function loadExistingProject() {
     document.getElementById('projectFileInput').click();
+}
+
+function updateFrameLayerList() {
+    const list = document.getElementById('frameLayerList');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    frames.forEach((frame, index) => {
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        item.innerHTML = `
+            <span>${index + 1}. ${parseFloat(frame.style.width) / scale} × ${parseFloat(frame.style.height) / scale} cm</span>
+            <div class="layer-delete" onclick="deleteFrameFromLayer(${index}); event.stopPropagation();">×</div>
+        `;
+
+        item.onclick = () => {
+            if (selectedFrame) selectedFrame.classList.remove('selected');
+            selectedFrame = frame;
+            frame.classList.add('selected');
+        };
+
+        list.appendChild(item);
+    });
+}
+
+function deleteFrameFromLayer(index) {
+    const frame = frames[index];
+    frame.remove();
+    frames.splice(index, 1);
+
+    if (selectedFrame === frame) selectedFrame = null;
+
+    updateInfo();
+    updateFrameLayerList();
+}
+
+// ==================== 액자 이벤트 통합 처리 ====================
+function addFrameEvents(frame) {
+    // 선택
+    frame.addEventListener("click", (e) => {
+        if (e.target.classList.contains("frame-delete")) return;
+        if (selectedFrame) selectedFrame.classList.remove("selected");
+        selectedFrame = frame;
+        frame.classList.add("selected");
+    });
+
+    // 드래그 시작
+    frame.addEventListener("mousedown", (e) => {
+        if (e.target.classList.contains("frame-delete")) return;
+        dragFrame = frame;
+
+        const rect = frame.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        e.preventDefault();
+    });
+
+    // 삭제 버튼 추가
+    const del = document.createElement("div");
+    del.className = "frame-delete";
+    del.textContent = "×";
+    del.onclick = (e) => deleteFrame(e, frame);
+
+    frame.appendChild(del);
+}
+
+// ==================== 레이어 목록 업데이트 ====================
+function updateFrameLayerList() {
+    const list = document.getElementById("frameLayerList");
+    list.innerHTML = "";
+
+    frames.forEach((frame) => {
+        const id = frame.dataset.id;
+        const width = parseInt(frame.style.width) / scale; // 수정: scale 적용
+        const height = parseInt(frame.style.height) / scale;
+
+        const item = document.createElement("div");
+        item.className = "layer-item";
+        item.dataset.id = id;
+
+        item.innerHTML = `
+            <span class="layer-name">액자 ${id}</span>
+            <span class="layer-size">${width}×${height}</span>
+        `;
+
+        // 클릭 시 해당 액자 강조 + 스크롤 이동
+        item.onclick = () => {
+            frame.scrollIntoView({ behavior: "smooth", block: "center" });
+            frame.classList.add("selected");
+            setTimeout(() => frame.classList.remove("selected"), 800);
+        };
+
+        list.appendChild(item);
+    });
+
+    // 스크롤 가능하도록 설정
+    list.style.overflowY = "auto";
+}
+
+// 수정: 요구3 - 컨텍스트 메뉴 함수들 추가
+function editWall() {
+    if (!contextMenuTarget) return;
+    const wallId = contextMenuTarget.dataset.wallId;
+    switchTab('wall-editor');
+    document.getElementById('wallSelect').value = wallId;
+    switchWall();
+}
+
+function viewWallStructure() {
+    if (!contextMenuTarget) return;
+    const wallId = contextMenuTarget.dataset.wallId;
+    const wallData = walls[wallId];
+    if (!wallData) return;
+
+    const popupWall = document.getElementById('popupWall');
+    popupWall.innerHTML = '';
+    popupWall.style.width = (wallData.width * scale) + 'px';
+    popupWall.style.height = (wallData.height * scale) + 'px';
+
+    wallData.frames.forEach(frameData => {
+        const frame = document.createElement('div');
+        frame.className = 'frame';
+        frame.style.width = (frameData.width * scale) + 'px';
+        frame.style.height = (frameData.height * scale) + 'px';
+        frame.style.left = frameData.left + 'px';
+        frame.style.top = frameData.top + 'px';
+        if (frameData.image) {
+            frame.style.backgroundImage = `url(${frameData.image})`;
+            frame.style.backgroundSize = 'cover';
+        }
+        frame.innerHTML = `<span>${frameData.width} × ${frameData.height} cm</span>`;
+        popupWall.appendChild(frame);
+    });
+
+    document.getElementById('popupWallName').textContent = `${wallData.name} 구조 (액자 ${wallData.frames.length}개)`;
+    document.getElementById('wallStructurePopup').classList.add('active');
+}
+
+function deleteWallFromContext() {
+    if (!contextMenuTarget) return;
+    deleteFloorWall(null, contextMenuTarget);
+}
+
+function closeWallStructurePopup() {
+    document.getElementById('wallStructurePopup').classList.remove('active');
 }
