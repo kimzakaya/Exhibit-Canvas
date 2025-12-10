@@ -208,6 +208,10 @@ h1 {
     overflow: auto;
     background: #f8f9fa;
     position: relative;
+
+    display: flex;
+    justify-content: center;  /* 가로 중앙 */
+    align-items: center;      /* 세로 중앙 */
 }
 
 .zoom-controls {
