@@ -435,8 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('initial-screen').style.display = 'flex';
 
-    document.getElementById('wallWidth').value = 4000;
-    document.getElementById('wallHeight').value = 3000;
+    document.getElementById('wallWidth').value = 300;
+    document.getElementById('wallHeight').value = 300;
     wallEditorZoom = 1;
     wallEditorPanX = 0;
     wallEditorPanY = 0;
