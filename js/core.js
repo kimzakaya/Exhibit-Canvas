@@ -21,6 +21,11 @@ let persons = []; // 벽에 배치된 사람 모형들
 let selectedPerson = null;
 let dragPerson = null;
 
+// 드래그 박스 선택 관련
+let isBoxSelecting = false;
+let boxSelectStart = { x: 0, y: 0 };
+let selectionBox = null;
+
 // 줌 관련
 let wallEditorZoom = 1;
 let floorPlanZoom = 1;
@@ -319,7 +324,6 @@ function loadProject(event) {
                 floorWall.style.transform = `rotate(${wallData.rotation}deg)`;
                 floorWall.innerHTML = `
                     <span>${wallInfo.name}</span>
-                    <div class="floor-wall-delete" onclick="deleteFloorWall(event, this.parentElement)">×</div>
                     <div class="rotation-handle"></div>
                 `;
                 

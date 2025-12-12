@@ -56,20 +56,19 @@ function addWallToFloorPlan(wallData) {
     const floorWall = document.createElement('div');
     floorWall.className = 'floor-wall';
     const wallWidth = wallData.width * 0.5;
-    floorWall.style.width = wallWidth + 'px';  // 평면도는 0.5 스케일
+    floorWall.style.width = wallWidth + 'px';
     floorWall.style.height = thickness + 'px';
     floorWall.style.left = '50px';
     floorWall.style.top = '50px';
     floorWall.innerHTML = `
         <span>${wallData.name}</span>
-        <div class="floor-wall-delete" onclick="deleteFloorWall(event, this.parentElement)">×</div>
         <div class="rotation-handle"></div>
     `;
     
     floorWall.dataset.wallId = wallData.id;
     floorWall.dataset.rotation = 0;
-    floorWall.dataset.wallWidth = wallWidth;  // 실제 너비 저장
-    floorWall.dataset.wallHeight = thickness;  // 실제 높이 저장
+    floorWall.dataset.wallWidth = wallWidth;
+    floorWall.dataset.wallHeight = thickness;
     
     floorWall.addEventListener('mousedown', startDragFloorWall);
     floorWall.addEventListener('click', selectFloorWall);
@@ -94,8 +93,8 @@ function getRotatedBounds(width, height, rotation) {
 }
 
 function startDragFloorWall(e) {
-    if (e.target.classList.contains('floor-wall-delete') || 
-        e.target.classList.contains('rotation-handle')) return;
+    // 우클릭이나 회전 핸들은 무시
+    if (e.button === 2 || e.target.classList.contains('rotation-handle')) return;
     
     dragFloorWall = e.currentTarget;
     
@@ -119,8 +118,7 @@ function startDragFloorWall(e) {
 }
 
 function selectFloorWall(e) {
-    if (e.target.classList.contains('floor-wall-delete') || 
-        e.target.classList.contains('rotation-handle')) return;
+    if (e.target.classList.contains('rotation-handle')) return;
     
     if (selectedFloorWall) {
         selectedFloorWall.classList.remove('selected');
@@ -131,10 +129,14 @@ function selectFloorWall(e) {
 }
 
 function deleteFloorWall(e, wall) {
-    e.stopPropagation();
-    wall.remove();
-    floorWalls = floorWalls.filter(w => w !== wall);
-    if (selectedFloorWall === wall) {
+    if (e) e.stopPropagation();
+    
+    const wallToDelete = wall || selectedFloorWall;
+    if (!wallToDelete) return;
+    
+    wallToDelete.remove();
+    floorWalls = floorWalls.filter(w => w !== wallToDelete);
+    if (selectedFloorWall === wallToDelete) {
         selectedFloorWall = null;
     }
 }
@@ -143,6 +145,22 @@ function startRotation(e) {
     e.stopPropagation();
     e.preventDefault();
     
+    // 더블클릭 감지
+    const rotationHandle = e.target;
+    const clickCount = parseInt(rotationHandle.dataset.clickCount || 0) + 1;
+    rotationHandle.dataset.clickCount = clickCount;
+    
+    setTimeout(() => {
+        rotationHandle.dataset.clickCount = 0;
+    }, 300);
+    
+    // 더블클릭이면 각도 입력
+    if (clickCount === 2) {
+        showRotationInput(e.target.parentElement);
+        return;
+    }
+    
+    // 기존 드래그 회전 기능
     isRotating = true;
     selectedFloorWall = e.target.parentElement;
     selectedFloorWall.classList.add('selected');
@@ -156,6 +174,22 @@ function startRotation(e) {
     rotationStartAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
 }
 
+function showRotationInput(wall) {
+    const currentRotation = parseFloat(wall.dataset.rotation || 0);
+    const angle = prompt(`회전 각도를 입력하세요 (현재: ${Math.round(currentRotation)}°)\n\n예: 45, 90, -30 등`, Math.round(currentRotation));
+    
+    if (angle === null) return; // 취소
+    
+    const newAngle = parseFloat(angle);
+    if (isNaN(newAngle)) {
+        alert('올바른 숫자를 입력해주세요.');
+        return;
+    }
+    
+    wall.style.transform = `rotate(${newAngle}deg)`;
+    wall.dataset.rotation = newAngle;
+}
+
 // ==================== 컨텍스트 메뉴 ====================
 function editWall() {
     if (!contextMenuTarget) return;
@@ -163,6 +197,9 @@ function editWall() {
     switchTab('wall-editor');
     document.getElementById('wallSelect').value = wallId;
     switchWall();
+    
+    // 컨텍스트 메뉴 닫기
+    document.getElementById('contextMenu').classList.remove('active');
 }
 
 function viewWallStructure() {
@@ -173,13 +210,13 @@ function viewWallStructure() {
 
     const popupWall = document.getElementById('popupWall');
     popupWall.innerHTML = '';
-    popupWall.style.width = wallData.width + 'px';  // 직접 px 사용
+    popupWall.style.width = wallData.width + 'px';
     popupWall.style.height = wallData.height + 'px';
 
     wallData.frames.forEach(frameData => {
         const frame = document.createElement('div');
         frame.className = 'frame';
-        frame.style.width = frameData.width + 'px';  // 직접 px 사용
+        frame.style.width = frameData.width + 'px';
         frame.style.height = frameData.height + 'px';
         frame.style.left = frameData.left + 'px';
         frame.style.top = frameData.top + 'px';
@@ -193,11 +230,48 @@ function viewWallStructure() {
 
     document.getElementById('popupWallName').textContent = `${wallData.name} 구조 (액자 ${wallData.frames.length}개)`;
     document.getElementById('wallStructurePopup').classList.add('active');
+    
+    // 컨텍스트 메뉴 닫기
+    document.getElementById('contextMenu').classList.remove('active');
+}
+
+function rotateWallByInput() {
+    if (!contextMenuTarget) return;
+    
+    const currentRotation = parseFloat(contextMenuTarget.dataset.rotation || 0);
+    const angle = prompt(`회전 각도를 입력하세요 (현재: ${Math.round(currentRotation)}°)\n\n예: 45, 90, -30 등`, Math.round(currentRotation));
+    
+    if (angle === null) return; // 취소
+    
+    const newAngle = parseFloat(angle);
+    if (isNaN(newAngle)) {
+        alert('올바른 숫자를 입력해주세요.');
+        return;
+    }
+    
+    contextMenuTarget.style.transform = `rotate(${newAngle}deg)`;
+    contextMenuTarget.dataset.rotation = newAngle;
+    
+    // 컨텍스트 메뉴 닫기
+    document.getElementById('contextMenu').classList.remove('active');
+}
+
+function resetWallRotation() {
+    if (!contextMenuTarget) return;
+    
+    contextMenuTarget.style.transform = 'rotate(0deg)';
+    contextMenuTarget.dataset.rotation = 0;
+    
+    // 컨텍스트 메뉴 닫기
+    document.getElementById('contextMenu').classList.remove('active');
 }
 
 function deleteWallFromContext() {
     if (!contextMenuTarget) return;
     deleteFloorWall(null, contextMenuTarget);
+    
+    // 컨텍스트 메뉴 닫기
+    document.getElementById('contextMenu').classList.remove('active');
 }
 
 function closeWallStructurePopup() {
@@ -206,9 +280,23 @@ function closeWallStructurePopup() {
 
 // ==================== 키보드 이벤트 ====================
 document.addEventListener('keydown', (e) => {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFloorWall) {
-        e.preventDefault();
-        deleteFloorWall(e, selectedFloorWall);
+    // DELETE 키로 삭제
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeTab = document.querySelector('.tab-content.active');
+        
+        if (activeTab && activeTab.id === 'wall-editor') {
+            // 벽 에디터에서는 선택된 액자 삭제
+            if (selectedFrames.length > 0) {
+                e.preventDefault();
+                deleteSelectedFrames();
+            }
+        } else if (activeTab && activeTab.id === 'floor-plan') {
+            // 평면도에서는 선택된 벽 삭제
+            if (selectedFloorWall) {
+                e.preventDefault();
+                deleteFloorWall(null, selectedFloorWall);
+            }
+        }
     }
     
     if (e.code === 'Space' && !e.repeat && !spacePressed) {
@@ -379,7 +467,7 @@ document.addEventListener('mousemove', (e) => {
         const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
         const angleDelta = currentAngle - rotationStartAngle;
         
-        const rotation = initialRotation + (angleDelta * 0.3);
+        const rotation = initialRotation + (angleDelta * 0.15);
         
         selectedFloorWall.style.transform = `rotate(${rotation}deg)`;
         selectedFloorWall.dataset.rotation = rotation;
@@ -443,6 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateWall();
     updateWallEditorTransform();
 
+    // 평면도 컨텍스트 메뉴
     const floorPlanCanvas = document.getElementById('floorPlanCanvas');
     floorPlanCanvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -455,16 +544,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 모든 컨텍스트 메뉴 닫기
     document.addEventListener('click', () => {
         document.getElementById('contextMenu').classList.remove('active');
+        document.getElementById('frameContextMenu').classList.remove('active');
     });
 
+    // 벽 에디터의 액자 우클릭 이벤트
     const wall = document.getElementById('wall');
     wall.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (e.target.classList.contains('frame')) {
-            selectedFrameForCrop = e.target;
-            openImageCropPopup();
+            // 다른 메뉴 닫기
+            document.getElementById('contextMenu').classList.remove('active');
+            
+            // 액자 컨텍스트 메뉴 표시
+            contextMenuTarget = e.target;
+            const menu = document.getElementById('frameContextMenu');
+            menu.style.left = `${e.pageX}px`;
+            menu.style.top = `${e.pageY}px`;
+            menu.classList.add('active');
+        }
+    });
+    
+    // 이미지 크롭 팝업 외부 클릭 시 닫기
+    document.getElementById('imageCropPopup').addEventListener('click', (e) => {
+        if (e.target.id === 'imageCropPopup') {
+            closeImageCropPopup();
+        }
+    });
+    
+    // 벽 구조 팝업 외부 클릭 시 닫기
+    document.getElementById('wallStructurePopup').addEventListener('click', (e) => {
+        if (e.target.id === 'wallStructurePopup') {
+            closeWallStructurePopup();
         }
     });
 });

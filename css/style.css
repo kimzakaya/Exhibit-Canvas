@@ -75,7 +75,8 @@ h1 {
 /* 메인 컨텐츠 */
 .main-content {
     display: flex;
-    min-height: 600px;
+    min-height: calc(100vh - 200px); /* 화면 높이에 맞춤 */
+    height: auto; /* 자동 높이 */
 }
 
 .controls {
@@ -85,6 +86,7 @@ h1 {
     border-right: 1px solid #bdc3c7;
     overflow-y: auto;
     max-height: calc(100vh - 200px);
+    flex-shrink: 0; /* 축소되지 않도록 */
 }
 
 .control-section {
@@ -712,4 +714,39 @@ h1 {
 .frame:hover {
     /* GPU 가속으로 부드러운 애니메이션 */
     transform: translateZ(0);
+}
+
+/* 선택 박스 스타일 */
+.selection-box {
+    position: absolute;
+    border: 2px dashed #3498db;
+    background: rgba(52, 152, 219, 0.1);
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* X 버튼 제거 관련 스타일 업데이트 */
+.frame-delete,
+.floor-wall-delete,
+.person-delete {
+    display: none !important;
+}
+
+/* 선택된 요소 스타일 강화 */
+.frame.selected {
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px #3498db;
+    z-index: 100;
+}
+
+.floor-wall.selected {
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px #3498db;
+    z-index: 100;
+}
+
+.person.selected {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 3px #ffd700;
+    z-index: 100;
 }

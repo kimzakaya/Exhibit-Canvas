@@ -46,11 +46,11 @@
                         <h3>벽 크기</h3>
                         <div class="control-group">
                             <label>벽 너비 (cm)</label>
-                            <input type="number" id="wallWidth" value="400" min="100" max="10000" step="1">
+                            <input type="number" id="wallWidth" value="3000" min="10" step="1">
                         </div>
                         <div class="control-group">
                             <label>벽 높이 (cm)</label>
-                            <input type="number" id="wallHeight" value="300" min="100" max="5000" step="1">
+                            <input type="number" id="wallHeight" value="3000" min="10" step="1">
                         </div>
                     </div>
 
@@ -62,11 +62,11 @@
                         </div>
                         <div class="control-group">
                             <label>액자 너비 (cm)</label>
-                            <input type="number" id="frameWidth" value="60" min="10" max="500" step="1">
+                            <input type="number" id="frameWidth" value="60" min="10" step="1">
                         </div>
                         <div class="control-group">
                             <label>액자 높이 (cm)</label>
-                            <input type="number" id="frameHeight" value="80" min="10" max="500" step="1">
+                            <input type="number" id="frameHeight" value="80" min="10" step="1">
                         </div>
                         <button class="button button-primary" onclick="addFrame()">액자 추가</button>
                         <button class="button button-secondary" onclick="clearAllFrames()">액자 전체 삭제</button>
@@ -162,11 +162,11 @@
                         <h3>공간 설정</h3>
                         <div class="control-group">
                             <label>공간 너비 (cm)</label>
-                            <input type="number" id="spaceWidth" value="800" min="400" max="2000" step="10">
+                            <input type="number" id="spaceWidth" value="800" min="100" step="10">
                         </div>
                         <div class="control-group">
                             <label>공간 높이 (cm)</label>
-                            <input type="number" id="spaceHeight" value="600" min="400" max="2000" step="10">
+                            <input type="number" id="spaceHeight" value="600" min="100" step="10">
                         </div>
                         <button class="button button-primary" onclick="updateFloorPlan()">공간 크기 적용</button>
                     </div>
@@ -209,7 +209,14 @@
     <div id="contextMenu" class="context-menu">
         <div class="context-menu-item" onclick="editWall()">✏️ 벽 수정</div>
         <div class="context-menu-item" onclick="viewWallStructure()">👁️ 벽 구조 확인</div>
+        <div class="context-menu-item" onclick="rotateWallByInput()">🔄 각도 입력 회전</div>
+        <div class="context-menu-item" onclick="resetWallRotation()">↺ 회전 초기화 (0°)</div>
         <div class="context-menu-item context-menu-delete" onclick="deleteWallFromContext()">🗑️ 벽 삭제</div>
+    </div>
+    
+    <div id="frameContextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="attachImageToFrame()">🖼️ 이미지 첨부</div>
+        <div class="context-menu-item context-menu-delete" onclick="deleteSelectedFrames()">🗑️ 삭제</div>
     </div>
 
     <!-- 벽 구조 확인 팝업 -->

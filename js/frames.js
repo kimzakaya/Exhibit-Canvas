@@ -76,13 +76,15 @@ function addFrameWithData(frameData) {
         frame.style.backgroundSize = 'cover';
         frame.dataset.image = frameData.image;
     }
-    frame.innerHTML = `
-        <span>${frameData.width} × ${frameData.height} cm</span>
-        <div class="frame-delete" onclick="deleteFrame(event, this.parentElement)">×</div>
-    `;
+    frame.innerHTML = `<span>${frameData.width} × ${frameData.height} cm</span>`;
     
     frame.addEventListener('mousedown', startDrag);
     frame.addEventListener('click', selectFrame);
+    frame.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showFrameContextMenu(e, frame);
+    });
     
     wall.appendChild(frame);
     frames.push(frame);
@@ -92,25 +94,26 @@ function addFrameWithData(frameData) {
 
 function addFrameEvents(frame) {
     frame.addEventListener("click", (e) => {
-        if (e.target.classList.contains("frame-delete")) return;
         selectFrame(e);
     });
 
     frame.addEventListener("mousedown", (e) => {
-        if (e.target.classList.contains("frame-delete")) return;
         startDrag(e);
     });
-
-    const del = document.createElement("div");
-    del.className = "frame-delete";
-    del.textContent = "×";
-    del.onclick = (e) => deleteFrame(e, frame);
-
-    frame.appendChild(del);
+    
+    // 우클릭 메뉴
+    frame.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 이미지 크롭 팝업 대신 컨텍스트 메뉴 표시
+        showFrameContextMenu(e, frame);
+    });
 }
 
 function startDrag(e) {
-    if (e.target.classList.contains('frame-delete')) return;
+    // 우클릭은 무시
+    if (e.button === 2) return;
     
     dragFrame = e.currentTarget;
     
@@ -130,8 +133,6 @@ function startDrag(e) {
 }
 
 function selectFrame(e) {
-    if (e.target.classList.contains('frame-delete')) return;
-    
     const frame = e.currentTarget;
     
     // Ctrl/Cmd 키로 다중 선택
@@ -151,6 +152,54 @@ function selectFrame(e) {
     }
     
     selectedFrame = selectedFrames.length > 0 ? selectedFrames[0] : null;
+}
+
+// 액자 컨텍스트 메뉴
+function showFrameContextMenu(e, frame) {
+    const menu = document.getElementById('frameContextMenu');
+    if (!menu) return;
+    
+    // 메뉴가 없으면 선택
+    if (!selectedFrames.includes(frame)) {
+        selectedFrames.forEach(f => f.classList.remove('selected'));
+        selectedFrames = [frame];
+        frame.classList.add('selected');
+        selectedFrame = frame;
+    }
+    
+    menu.style.left = `${e.pageX}px`;
+    menu.style.top = `${e.pageY}px`;
+    menu.classList.add('active');
+    
+    contextMenuTarget = frame;
+}
+
+function deleteSelectedFrames() {
+    if (selectedFrames.length === 0) return;
+    
+    selectedFrames.forEach(frame => {
+        frame.remove();
+        frames = frames.filter(f => f !== frame);
+    });
+    
+    selectedFrames = [];
+    selectedFrame = null;
+    updateInfo();
+    updateFrameLayerList();
+    
+    // 컨텍스트 메뉴 닫기
+    const menu = document.getElementById('frameContextMenu');
+    if (menu) menu.classList.remove('active');
+}
+
+function attachImageToFrame() {
+    if (!contextMenuTarget) return;
+    selectedFrameForCrop = contextMenuTarget;
+    openImageCropPopup();
+    
+    // 컨텍스트 메뉴 닫기
+    const menu = document.getElementById('frameContextMenu');
+    if (menu) menu.classList.remove('active');
 }
 
 function deleteFrame(e, frame) {
