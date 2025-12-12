@@ -115,7 +115,17 @@ function startDrag(e) {
     // 우클릭은 무시
     if (e.button === 2) return;
     
-    dragFrame = e.currentTarget;
+    const clickedFrame = e.currentTarget;
+    
+    // 선택된 액자들 중 하나를 클릭한 경우 - 여러 액자 함께 드래그
+    if (selectedFrames.length > 1 && selectedFrames.includes(clickedFrame)) {
+        window.startMultiFrameDrag(e, clickedFrame);
+        e.preventDefault();
+        return;
+    }
+    
+    // 단일 액자 드래그
+    dragFrame = clickedFrame;
     
     const wall = document.getElementById('wall');
     const wallRect = wall.getBoundingClientRect();

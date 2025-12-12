@@ -321,6 +321,175 @@ document.addEventListener('keyup', (e) => {
     }
 });
 
+// ==================== 드래그 박스 선택 ====================
+let isDragSelecting = false;
+let dragSelectBox = null;
+let dragSelectStartX = 0;
+let dragSelectStartY = 0;
+let isDraggingMultiple = false;
+let multiDragOffsets = [];
+
+function createDragSelectBox() {
+    if (!dragSelectBox) {
+        dragSelectBox = document.createElement('div');
+        dragSelectBox.style.position = 'absolute';
+        dragSelectBox.style.border = '2px dashed #3498db';
+        dragSelectBox.style.backgroundColor = 'rgba(52, 152, 219, 0.1)';
+        dragSelectBox.style.pointerEvents = 'none';
+        dragSelectBox.style.zIndex = '9999';
+        dragSelectBox.style.display = 'none';
+    }
+    return dragSelectBox;
+}
+
+function startDragSelect(e, wall) {
+    const wallRect = wall.getBoundingClientRect();
+    
+    // 마우스 위치를 캔버스 좌표계로 변환
+    const mouseXInWall = (e.clientX - wallRect.left) / wallEditorZoom - wallEditorPanX / wallEditorZoom;
+    const mouseYInWall = (e.clientY - wallRect.top) / wallEditorZoom - wallEditorPanY / wallEditorZoom;
+    
+    dragSelectStartX = mouseXInWall;
+    dragSelectStartY = mouseYInWall;
+    
+    isDragSelecting = true;
+    
+    const box = createDragSelectBox();
+    wall.appendChild(box);
+    box.style.display = 'block';
+    box.style.left = dragSelectStartX + 'px';
+    box.style.top = dragSelectStartY + 'px';
+    box.style.width = '0px';
+    box.style.height = '0px';
+}
+
+function updateDragSelect(e, wall) {
+    if (!isDragSelecting || !dragSelectBox) return;
+    
+    const wallRect = wall.getBoundingClientRect();
+    
+    const mouseXInWall = (e.clientX - wallRect.left) / wallEditorZoom - wallEditorPanX / wallEditorZoom;
+    const mouseYInWall = (e.clientY - wallRect.top) / wallEditorZoom - wallEditorPanY / wallEditorZoom;
+    
+    const width = mouseXInWall - dragSelectStartX;
+    const height = mouseYInWall - dragSelectStartY;
+    
+    if (width < 0) {
+        dragSelectBox.style.left = mouseXInWall + 'px';
+        dragSelectBox.style.width = Math.abs(width) + 'px';
+    } else {
+        dragSelectBox.style.left = dragSelectStartX + 'px';
+        dragSelectBox.style.width = width + 'px';
+    }
+    
+    if (height < 0) {
+        dragSelectBox.style.top = mouseYInWall + 'px';
+        dragSelectBox.style.height = Math.abs(height) + 'px';
+    } else {
+        dragSelectBox.style.top = dragSelectStartY + 'px';
+        dragSelectBox.style.height = height + 'px';
+    }
+}
+
+function endDragSelect(wall) {
+    if (!isDragSelecting || !dragSelectBox) return;
+    
+    const boxRect = {
+        left: parseFloat(dragSelectBox.style.left),
+        top: parseFloat(dragSelectBox.style.top),
+        width: parseFloat(dragSelectBox.style.width),
+        height: parseFloat(dragSelectBox.style.height)
+    };
+    
+    boxRect.right = boxRect.left + boxRect.width;
+    boxRect.bottom = boxRect.top + boxRect.height;
+    
+    // 선택 박스와 겹치는 액자 찾기
+    const frames = wall.querySelectorAll('.frame');
+    frames.forEach(frame => {
+        const frameRect = {
+            left: parseFloat(frame.style.left),
+            top: parseFloat(frame.style.top),
+            width: frame.offsetWidth,
+            height: frame.offsetHeight
+        };
+        
+        frameRect.right = frameRect.left + frameRect.width;
+        frameRect.bottom = frameRect.top + frameRect.height;
+        
+        // 겹침 검사
+        const isOverlapping = !(
+            boxRect.right < frameRect.left ||
+            boxRect.left > frameRect.right ||
+            boxRect.bottom < frameRect.top ||
+            boxRect.top > frameRect.bottom
+        );
+        
+        if (isOverlapping) {
+            if (!selectedFrames.includes(frame)) {
+                frame.classList.add('selected');
+                selectedFrames.push(frame);
+            }
+        }
+    });
+    
+    dragSelectBox.style.display = 'none';
+    isDragSelecting = false;
+    
+    updateFrameLayerList();
+}
+
+function startMultiFrameDrag(e, clickedFrame) {
+    // 선택된 액자들 중 하나를 드래그 시작
+    if (!selectedFrames.includes(clickedFrame)) return;
+    
+    isDraggingMultiple = true;
+    
+    const wall = document.getElementById('wall');
+    const wallRect = wall.getBoundingClientRect();
+    
+    const mouseXInWall = (e.clientX - wallRect.left) / wallEditorZoom - wallEditorPanX / wallEditorZoom;
+    const mouseYInWall = (e.clientY - wallRect.top) / wallEditorZoom - wallEditorPanY / wallEditorZoom;
+    
+    // 각 선택된 액자의 오프셋 저장
+    multiDragOffsets = selectedFrames.map(frame => ({
+        frame: frame,
+        offsetX: mouseXInWall - parseFloat(frame.style.left),
+        offsetY: mouseYInWall - parseFloat(frame.style.top)
+    }));
+}
+
+function updateMultiFrameDrag(e) {
+    if (!isDraggingMultiple) return;
+    
+    const wall = document.getElementById('wall');
+    const wallRect = wall.getBoundingClientRect();
+    
+    const mouseXInWall = (e.clientX - wallRect.left) / wallEditorZoom - wallEditorPanX / wallEditorZoom;
+    const mouseYInWall = (e.clientY - wallRect.top) / wallEditorZoom - wallEditorPanY / wallEditorZoom;
+    
+    const wallWidth = wallRect.width / wallEditorZoom;
+    const wallHeight = wallRect.height / wallEditorZoom;
+    
+    // 모든 선택된 액자 이동
+    multiDragOffsets.forEach(({ frame, offsetX, offsetY }) => {
+        let newX = mouseXInWall - offsetX;
+        let newY = mouseYInWall - offsetY;
+        
+        // 경계 체크
+        newX = Math.max(0, Math.min(newX, wallWidth - frame.offsetWidth));
+        newY = Math.max(0, Math.min(newY, wallHeight - frame.offsetHeight));
+        
+        frame.style.left = newX + 'px';
+        frame.style.top = newY + 'px';
+    });
+}
+
+function endMultiFrameDrag() {
+    isDraggingMultiple = false;
+    multiDragOffsets = [];
+}
+
 // ==================== 마우스 이벤트 ====================
 document.addEventListener('mousedown', (e) => {
     if (spacePressed && e.button === 0) {
@@ -344,6 +513,23 @@ document.addEventListener('mousedown', (e) => {
             e.preventDefault();
         }
     }
+    
+    // 벽 에디터에서 빈 공간 드래그 시작 (드래그 박스 선택)
+    if (!spacePressed && e.button === 0) {
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'wall-editor') {
+            const wall = document.getElementById('wall');
+            if (e.target === wall) {
+                // Ctrl 키가 눌리지 않았으면 기존 선택 해제
+                if (!e.ctrlKey && !e.metaKey) {
+                    selectedFrames.forEach(f => f.classList.remove('selected'));
+                    selectedFrames = [];
+                }
+                startDragSelect(e, wall);
+                e.preventDefault();
+            }
+        }
+    }
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -357,6 +543,19 @@ document.addEventListener('mousemove', (e) => {
             floorPlanPanY = e.clientY - panStartY;
             updateFloorPlanTransform();
         }
+        return;
+    }
+    
+    // 드래그 박스 선택 업데이트
+    if (isDragSelecting) {
+        const wall = document.getElementById('wall');
+        updateDragSelect(e, wall);
+        return;
+    }
+    
+    // 여러 액자 동시 드래그
+    if (isDraggingMultiple) {
+        updateMultiFrameDrag(e);
         return;
     }
     
@@ -475,6 +674,17 @@ document.addEventListener('mousemove', (e) => {
 });
 
 document.addEventListener('mouseup', () => {
+    // 드래그 박스 선택 종료
+    if (isDragSelecting) {
+        const wall = document.getElementById('wall');
+        endDragSelect(wall);
+    }
+    
+    // 여러 액자 드래그 종료
+    if (isDraggingMultiple) {
+        endMultiFrameDrag();
+    }
+    
     dragFrame = null;
     dragFloorWall = null;
     dragPerson = null;
