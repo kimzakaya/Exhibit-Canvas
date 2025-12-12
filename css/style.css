@@ -303,7 +303,6 @@ h1 {
     font-size: 12px;
     color: #7f8c8d;
     user-select: none;
-    background-position: center; /* 수정: 요구4 - 이미지 중앙 정렬 */
 }
 
 .frame:hover {
@@ -605,9 +604,6 @@ h1 {
     padding: 30px;
     overflow: auto;
     flex: 1;
-    display: flex; /* 수정: 중앙 정렬 */
-    justify-content: center;
-    align-items: center;
 }
 
 .popup-wall {
@@ -624,4 +620,96 @@ h1 {
 
 .popup-wall .frame-delete {
     display: none !important;
+}
+/* 사람 모형 스타일 추가 */
+.person {
+    position: absolute;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    cursor: move;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    user-select: none;
+    border-radius: 8px;
+    border: 2px solid #5568d3;
+    transition: all 0.2s;
+    /* GPU 가속 */
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+.person:hover {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+    z-index: 10;
+    transform: scale(1.02) translateZ(0);
+}
+
+.person.selected {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 2px #ffd700;
+}
+
+.person svg {
+    opacity: 0.9;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
+.person span {
+    position: absolute;
+    bottom: -25px;
+    font-size: 11px;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.person-delete {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
+    background: #e74c3c;
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 100;
+}
+
+.person.selected .person-delete {
+    display: flex;
+}
+
+.person-delete:hover {
+    background: #c0392b;
+    transform: scale(1.1);
+}
+
+/* 액자 성능 최적화 */
+.frame {
+    /* GPU 가속 활성화 */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    /* 이미지 렌더링 최적화 */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+.frame:hover {
+    /* GPU 가속으로 부드러운 애니메이션 */
+    transform: translateZ(0);
 }

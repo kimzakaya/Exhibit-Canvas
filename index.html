@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Exhibit Canvas</title>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Cropper.js CDN 추가 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -43,11 +46,11 @@
                         <h3>벽 크기</h3>
                         <div class="control-group">
                             <label>벽 너비 (cm)</label>
-                            <input type="number" id="wallWidth" value="400" min="100" max="1000">
+                            <input type="number" id="wallWidth" value="400" min="100" max="10000" step="1">
                         </div>
                         <div class="control-group">
                             <label>벽 높이 (cm)</label>
-                            <input type="number" id="wallHeight" value="300" min="100" max="500">
+                            <input type="number" id="wallHeight" value="300" min="100" max="5000" step="1">
                         </div>
                     </div>
 
@@ -57,20 +60,29 @@
                             <label>액자 이름</label>
                             <input type="text" id="frameName" placeholder="예: 작품1, 서울전경" maxlength="30">
                         </div>
-                        <div class="control-group"> <!-- 수정: 이미지 업로드 입력 추가 -->
-                            <label>액자 사진 선택 (선택사항)</label>
-                            <input type="file" id="frameImage" accept="image/*">
-                        </div>
                         <div class="control-group">
                             <label>액자 너비 (cm)</label>
-                            <input type="number" id="frameWidth" value="60" min="10" max="200">
+                            <input type="number" id="frameWidth" value="60" min="10" max="500" step="1">
                         </div>
                         <div class="control-group">
                             <label>액자 높이 (cm)</label>
-                            <input type="number" id="frameHeight" value="80" min="10" max="200">
+                            <input type="number" id="frameHeight" value="80" min="10" max="500" step="1">
                         </div>
                         <button class="button button-primary" onclick="addFrame()">액자 추가</button>
                         <button class="button button-secondary" onclick="clearAllFrames()">액자 전체 삭제</button>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>👤 사람 모형 추가</h3>
+                        <div class="control-group">
+                            <label>사람 키 (cm)</label>
+                            <input type="number" id="personHeight" value="170" min="50" max="250" step="1" placeholder="예: 170">
+                        </div>
+                        <button class="button" style="background: #9b59b6; color: white;" onclick="addPerson()">👤 사람 추가</button>
+                        <button class="button button-secondary" onclick="clearAllPersons()">사람 전체 삭제</button>
+                        <div class="info-item" style="margin-top: 10px; font-size: 12px;">
+                            💡 사람 모형으로 실제 비율을 확인하세요
+                        </div>
                     </div>
 
                     <div class="control-section">
@@ -111,11 +123,11 @@
                         <h3>공간 설정</h3>
                         <div class="control-group">
                             <label>공간 너비 (cm)</label>
-                            <input type="number" id="spaceWidth" value="800" min="400" max="2000">
+                            <input type="number" id="spaceWidth" value="800" min="400" max="2000" step="10">
                         </div>
                         <div class="control-group">
                             <label>공간 높이 (cm)</label>
-                            <input type="number" id="spaceHeight" value="600" min="400" max="2000">
+                            <input type="number" id="spaceHeight" value="600" min="400" max="2000" step="10">
                         </div>
                         <button class="button button-primary" onclick="updateFloorPlan()">공간 크기 적용</button>
                     </div>
@@ -174,6 +186,26 @@
         </div>
     </div>
 
-    <script src="js/script.js"></script>
+    <!-- 새 이미지 크롭 팝업 -->
+    <div id="imageCropPopup" class="popup-overlay">
+        <div class="popup-container">
+            <div class="popup-header">
+                <h2>액자 이미지 첨부 및 크롭</h2>
+                <button class="popup-close" onclick="closeImageCropPopup()">×</button>
+            </div>
+            <div class="popup-content">
+                <input type="file" id="popupImageInput" accept="image/*">
+                <img id="cropImage" style="max-width: 100%; display: none;">
+                <div class="crop-controls">
+                    <button class="button button-primary" onclick="applyCroppedImage()">적용</button>
+                    <button class="button button-secondary" onclick="closeImageCropPopup()">취소</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/core.js"></script>
+    <script src="js/frames.js"></script>
+    <script src="js/floorplan.js"></script>
 </body>
 </html>

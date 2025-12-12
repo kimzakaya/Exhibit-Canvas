@@ -1,5 +1,5 @@
 // 전역 변수
-const scale = 0.5; // 1cm = 0.5px
+const scale = 0.05; // 1cm = 0.5px
 let walls = {}; // 저장된 모든 벽들
 let currentWallId = null; // 현재 편집 중인 벽
 let frames = []; // 현재 벽의 액자들
@@ -29,8 +29,12 @@ let panStartY = 0;
 let panningWorkspace = null;
 let spacePressed = false;
 
-// 수정: 컨텍스트 메뉴 관련 전역 변수 추가
+// 컨텍스트 메뉴 관련
 let contextMenuTarget = null;
+
+// 이미지 크롭 관련
+let selectedFrameForCrop = null;
+let cropper = null;
 
 // ==================== 탭 전환 ====================
 function switchTab(tabId) {
@@ -85,15 +89,15 @@ function createOrUpdateWall() {
             height: parseFloat(frame.style.height) / scale,
             left: parseFloat(frame.style.left),
             top: parseFloat(frame.style.top),
-            image: frame.dataset.image || null // 수정: 이미지 데이터 저장
+            image: frame.dataset.image || null
         }))
     };
     
     currentWallId = wallId;
     updateWallSelect();
-    updateWall(); // 수정: 요구1 - 벽 저장 후 즉시 업데이트
-    updateInfo(); // 수정: 요구1 - 정보 업데이트
-    updateWallList(); // 수정: 요구2 - 평면도 목록 즉시 업데이트
+    updateWall();
+    updateInfo();
+    updateWallList();
     alert(`"${wallName}" 벽이 저장되었습니다!`);
 }
 
@@ -123,7 +127,7 @@ function switchWall() {
         document.getElementById('wallWidth').value = 400;
         document.getElementById('wallHeight').value = 300;
         clearAllFrames();
-        updateWall(); // 수정: 요구1 - 새 벽 시 업데이트
+        updateWall();
         updateInfo();
         return;
     }
@@ -139,10 +143,10 @@ function switchWall() {
     // 액자 복원
     clearAllFrames();
     wall.frames.forEach(frameData => {
-        addFrameWithData(frameData); // 수정: 이미지 포함 복원
+        addFrameWithData(frameData);
     });
     
-    updateWall(); // 수정: 요구1 - 전환 시 업데이트
+    updateWall();
     updateInfo();
 }
 
@@ -157,11 +161,20 @@ function deleteCurrentWall() {
         delete walls[currentWallId];
         currentWallId = null;
         document.getElementById('wallName').value = '';
+        document.getElementById('wallWidth').value = 400; // 수정: 벽 크기 입력 초기화
+        document.getElementById('wallHeight').value = 300; // 수정: 벽 크기 입력 초기화
         clearAllFrames();
         updateWallSelect();
         updateWall();
-        updateInfo(); // 수정: 요구1 - 삭제 후 업데이트
-        updateWallList(); // 수정: 요구2 - 목록 업데이트
+        updateInfo();
+        updateWallList();
+        
+        // 수정: 줌과 팬 상태 초기화 (캔버스 왜곡 방지)
+        wallEditorZoom = 1;
+        wallEditorPanX = 0;
+        wallEditorPanY = 0;
+        updateWallEditorTransform();
+        document.getElementById('wallEditorZoomValue').textContent = '100%';
     }
 }
 
@@ -174,8 +187,8 @@ function updateWall() {
     wall.style.width = (width * scale) + 'px';
     wall.style.height = (height * scale) + 'px';
     
-    document.getElementById('wallSize').textContent = width + ' × ' + height + ' cm';
-    updateInfo(); // 수정: 요구1 - 항상 정보 업데이트
+    document.getElementById('wallSize').textContent = width + ' × ' + height + ' mm';
+    updateInfo();
 }
 
 function toggleGrid() {
@@ -192,7 +205,6 @@ function toggleGrid() {
 // ==================== 액자 관리 ====================
 function addFrame() {
     const nameInput = document.getElementById("frameName");
-    const imageInput = document.getElementById("frameImage");
     const width = parseInt(document.getElementById("frameWidth").value);
     const height = parseInt(document.getElementById("frameHeight").value);
 
@@ -226,66 +238,7 @@ function addFrame() {
     // 레이어 목록에 추가
     addFrameLayerItem(id, frameName, width, height);
 
-    // 수정: 이미지 업로드 및 크롭 처리
-    if (imageInput.files && imageInput.files[0]) {
-        const file = imageInput.files[0];
-        if (!file.type.startsWith('image/')) {
-            alert('이미지 파일만 업로드 가능합니다.');
-            imageInput.value = ""; // 입력 초기화
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) { // 5MB 제한 (옵션: 메모리 보호)
-            alert('5MB 이하의 이미지만 업로드해주세요.');
-            imageInput.value = "";
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const frameAspectRatio = width / height; // 액자 비율
-                
-                // Canvas로 자동 중앙 크롭
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                let outputWidth = img.width;
-                let outputHeight = img.height;
-                const imgAspectRatio = img.width / img.height;
-                
-                if (imgAspectRatio > frameAspectRatio) {
-                    // 사진이 액자보다 넓음: 높이 맞추고 가로 크롭
-                    outputWidth = img.height * frameAspectRatio;
-                } else if (imgAspectRatio < frameAspectRatio) {
-                    // 사진이 액자보다 좁음: 가로 맞추고 세로 크롭
-                    outputHeight = img.width / frameAspectRatio;
-                }
-                
-                canvas.width = width * scale; // 실제 액자 픽셀 크기
-                canvas.height = height * scale;
-                
-                const outputX = (outputWidth - img.width) * 0.5;
-                const outputY = (outputHeight - img.height) * 0.5;
-                
-                // 크롭된 이미지 그리기 (중앙 중심)
-                ctx.drawImage(img, outputX, outputY, outputWidth, outputHeight, 0, 0, canvas.width, canvas.height);
-                
-                // 크롭된 이미지를 base64로 변환 (JPEG 압축 80%로 파일 크기 줄임)
-                const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                
-                frame.style.backgroundImage = `url(${croppedDataUrl})`;
-                frame.style.backgroundSize = 'cover';  // CSS로 최종 맞춤
-                frame.style.backgroundPosition = 'center';
-                frame.dataset.image = croppedDataUrl;  // 프로젝트 저장용 base64
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-        imageInput.value = ""; // 입력 초기화
-    }
-
-    updateInfo(); // 기존: 정보 업데이트
+    updateInfo();
 }
 
 function addFrameLayerItem(id, name, width, height) {
@@ -322,7 +275,7 @@ function addFrameWithData(frameData) {
     frame.style.height = (frameData.height * scale) + 'px';
     frame.style.left = frameData.left + 'px';
     frame.style.top = frameData.top + 'px';
-    if (frameData.image) { // 수정: 요구4 - 이미지 복원
+    if (frameData.image) {
         frame.style.backgroundImage = `url(${frameData.image})`;
         frame.style.backgroundSize = 'cover';
         frame.dataset.image = frameData.image;
@@ -372,7 +325,7 @@ function deleteFrame(e, frame) {
         selectedFrame = null;
     }
     updateInfo();
-    updateFrameLayerList(); // 수정: 레이어 업데이트
+    updateFrameLayerList();
 }
 
 function clearAllFrames() {
@@ -616,7 +569,7 @@ function loadProject(event) {
             document.querySelector('.header').style.display = 'block';
             document.querySelector('.tabs').style.display = 'flex';
             switchTab('floor-plan');
-            updateWallList();  // 추가: 명시적 업데이트
+            updateWallList();
 
             alert('프로젝트를 불러왔습니다!');
         } catch (error) {
@@ -799,7 +752,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('initial-screen').style.display = 'flex';
 
-    // 수정: 요구3 - 평면도 캔버스에 우클릭 이벤트 추가
+    // 수정: 초기 로드 시 벽 크기 강제 리셋 (가벽 자동 생성 방지)
+    document.getElementById('wallWidth').value = 4000; // mm 기본
+    document.getElementById('wallHeight').value = 3000; // mm 기본
+    wallEditorZoom = 1;
+    wallEditorPanX = 0;
+    wallEditorPanY = 0;
+    updateWall();
+    updateWallEditorTransform();
+
+    // 평면도 컨텍스트 메뉴 이벤트
     const floorPlanCanvas = document.getElementById('floorPlanCanvas');
     floorPlanCanvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -815,6 +777,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 컨텍스트 메뉴 외 클릭 시 숨김
     document.addEventListener('click', () => {
         document.getElementById('contextMenu').classList.remove('active');
+    });
+
+    // 벽 에디터에서 액자 우클릭으로 이미지 크롭 팝업 열기
+    const wall = document.getElementById('wall');
+    wall.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (e.target.classList.contains('frame')) {
+            selectedFrameForCrop = e.target;
+            openImageCropPopup();
+        }
     });
 });
 
@@ -835,33 +807,32 @@ function updateFrameLayerList() {
 
     list.innerHTML = '';
 
-    frames.forEach((frame, index) => {
-        const item = document.createElement('div');
-        item.className = 'layer-item';
+    frames.forEach((frame) => {
+        const id = frame.dataset.id;
+        const width = parseInt(frame.style.width) / scale;
+        const height = parseInt(frame.style.height) / scale;
+
+        const item = document.createElement("div");
+        item.className = "layer-item";
+        item.dataset.id = id;
+
         item.innerHTML = `
-            <span>${index + 1}. ${parseFloat(frame.style.width) / scale} × ${parseFloat(frame.style.height) / scale} cm</span>
-            <div class="layer-delete" onclick="deleteFrameFromLayer(${index}); event.stopPropagation();">×</div>
+            <span class="layer-name">액자 ${id}</span>
+            <span class="layer-size">${width}×${height}</span>
         `;
 
+        // 클릭 시 해당 액자 강조 + 스크롤 이동
         item.onclick = () => {
-            if (selectedFrame) selectedFrame.classList.remove('selected');
-            selectedFrame = frame;
-            frame.classList.add('selected');
+            frame.scrollIntoView({ behavior: "smooth", block: "center" });
+            frame.classList.add("selected");
+            setTimeout(() => frame.classList.remove("selected"), 800);
         };
 
         list.appendChild(item);
     });
-}
 
-function deleteFrameFromLayer(index) {
-    const frame = frames[index];
-    frame.remove();
-    frames.splice(index, 1);
-
-    if (selectedFrame === frame) selectedFrame = null;
-
-    updateInfo();
-    updateFrameLayerList();
+    // 스크롤 가능하도록 설정
+    list.style.overflowY = "auto";
 }
 
 // ==================== 액자 이벤트 통합 처리 ====================
@@ -895,40 +866,7 @@ function addFrameEvents(frame) {
     frame.appendChild(del);
 }
 
-// ==================== 레이어 목록 업데이트 ====================
-function updateFrameLayerList() {
-    const list = document.getElementById("frameLayerList");
-    list.innerHTML = "";
-
-    frames.forEach((frame) => {
-        const id = frame.dataset.id;
-        const width = parseInt(frame.style.width) / scale; // 수정: scale 적용
-        const height = parseInt(frame.style.height) / scale;
-
-        const item = document.createElement("div");
-        item.className = "layer-item";
-        item.dataset.id = id;
-
-        item.innerHTML = `
-            <span class="layer-name">액자 ${id}</span>
-            <span class="layer-size">${width}×${height}</span>
-        `;
-
-        // 클릭 시 해당 액자 강조 + 스크롤 이동
-        item.onclick = () => {
-            frame.scrollIntoView({ behavior: "smooth", block: "center" });
-            frame.classList.add("selected");
-            setTimeout(() => frame.classList.remove("selected"), 800);
-        };
-
-        list.appendChild(item);
-    });
-
-    // 스크롤 가능하도록 설정
-    list.style.overflowY = "auto";
-}
-
-// 수정: 요구3 - 컨텍스트 메뉴 함수들 추가
+// ==================== 컨텍스트 메뉴 함수들 ====================
 function editWall() {
     if (!contextMenuTarget) return;
     const wallId = contextMenuTarget.dataset.wallId;
@@ -974,4 +912,83 @@ function deleteWallFromContext() {
 
 function closeWallStructurePopup() {
     document.getElementById('wallStructurePopup').classList.remove('active');
+}
+
+// ==================== 이미지 크롭 팝업 ====================
+function openImageCropPopup() {
+    document.getElementById('imageCropPopup').classList.add('active');
+    const input = document.getElementById('popupImageInput');
+    input.value = ''; // 초기화
+
+    const cropImage = document.getElementById('cropImage');
+    cropImage.style.display = 'none'; // 초기 숨김
+
+    input.onchange = function() {
+        const file = input.files[0];
+        if (!file || !file.type.startsWith('image/')) {
+            alert('이미지 파일만 업로드 가능합니다.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            cropImage.src = e.target.result;
+            cropImage.style.display = 'block';
+
+            // Cropper 초기화
+            if (cropper) cropper.destroy(); // 기존 파괴
+
+            const frameWidth = parseFloat(selectedFrameForCrop.style.width) / scale;
+            const frameHeight = parseFloat(selectedFrameForCrop.style.height) / scale;
+            const aspectRatio = frameWidth / frameHeight; // 액자 비율 고정
+
+            cropper = new Cropper(cropImage, {
+                aspectRatio: aspectRatio, // 액자 비율 강제
+                viewMode: 1, // 캔버스 내에서만 크롭
+                autoCropArea: 0.8, // 초기 크롭 영역 80%
+                dragMode: 'move', // 드래그로 이동 가능
+                background: true, // 배경 표시
+                center: true, // 중앙 표시
+                guides: true, // 가이드 라인
+                highlight: true, // 하이라이트
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                zoomable: true, // 줌 가능
+                zoomOnWheel: true,
+                rotatable: false // 회전 비활성 (필요시 true)
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+}
+
+function applyCroppedImage() {
+    if (!cropper || !selectedFrameForCrop) return;
+
+    // 크롭된 캔버스 얻기 (액자 크기로 리사이즈)
+    const croppedCanvas = cropper.getCroppedCanvas({
+        width: selectedFrameForCrop.offsetWidth,
+        height: selectedFrameForCrop.offsetHeight,
+        fillColor: '#fff', // 배경 흰색
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+    });
+
+    const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 0.8); // JPEG 80% 압축
+    selectedFrameForCrop.style.backgroundImage = `url(${croppedUrl})`;
+    selectedFrameForCrop.style.backgroundSize = 'cover';
+    selectedFrameForCrop.style.backgroundPosition = 'center';
+    selectedFrameForCrop.dataset.image = croppedUrl; // 저장용
+
+    closeImageCropPopup();
+}
+
+function closeImageCropPopup() {
+    document.getElementById('imageCropPopup').classList.remove('active');
+    if (cropper) {
+        cropper.destroy();
+        cropper = null;
+    }
+    selectedFrameForCrop = null;
+    document.getElementById('cropImage').src = ''; // 초기화
+    document.getElementById('cropImage').style.display = 'none';
 }
