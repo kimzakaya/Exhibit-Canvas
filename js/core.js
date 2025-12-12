@@ -96,6 +96,15 @@ function createOrUpdateWall() {
     
     currentWallId = wallId;
     updateWallSelect();
+    
+    // 벽 저장 후 초기 상태로 리셋
+    document.getElementById('wallSelect').value = '';
+    currentWallId = null;
+    document.getElementById('wallName').value = '';
+    document.getElementById('wallWidth').value = 400;
+    document.getElementById('wallHeight').value = 300;
+    clearAllFrames();
+    
     updateWall();
     updateInfo();
     updateWallList();
@@ -120,6 +129,20 @@ function updateWallSelect() {
 
 function switchWall() {
     const wallId = document.getElementById('wallSelect').value;
+    
+    // 현재 작업 중인 벽이 있으면 먼저 자동 저장
+    if (currentWallId && walls[currentWallId]) {
+        const currentWallName = document.getElementById('wallName').value.trim();
+        if (currentWallName) {
+            walls[currentWallId].frames = frames.map(frame => ({
+                width: parseFloat(frame.dataset.width || frame.style.width),
+                height: parseFloat(frame.dataset.height || frame.style.height),
+                left: parseFloat(frame.style.left),
+                top: parseFloat(frame.style.top),
+                image: frame.dataset.image || null
+            }));
+        }
+    }
     
     if (!wallId) {
         currentWallId = null;
@@ -285,10 +308,11 @@ function loadProject(event) {
                 
                 const canvas = document.getElementById('floorPlanCanvas');
                 const thickness = 20;
+                const wallWidth = wallInfo.width * 0.5;  // 평면도 스케일
                 
                 const floorWall = document.createElement('div');
                 floorWall.className = 'floor-wall';
-                floorWall.style.width = (wallInfo.width * scale) + 'px';
+                floorWall.style.width = wallWidth + 'px';
                 floorWall.style.height = thickness + 'px';
                 floorWall.style.left = wallData.left + 'px';
                 floorWall.style.top = wallData.top + 'px';
@@ -301,6 +325,8 @@ function loadProject(event) {
                 
                 floorWall.dataset.wallId = wallData.wallId;
                 floorWall.dataset.rotation = wallData.rotation;
+                floorWall.dataset.wallWidth = wallWidth;  // 실제 너비 저장
+                floorWall.dataset.wallHeight = thickness;  // 실제 높이 저장
                 
                 floorWall.addEventListener('mousedown', startDragFloorWall);
                 floorWall.addEventListener('click', selectFloorWall);

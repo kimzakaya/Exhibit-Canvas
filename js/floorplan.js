@@ -17,14 +17,34 @@ function updateWallList() {
         return;
     }
     
+    // 안내 메시지 추가
+    const hint = document.createElement('div');
+    hint.className = 'info-item';
+    hint.style.marginBottom = '10px';
+    hint.style.fontSize = '13px';
+    hint.style.color = '#3498db';
+    hint.innerHTML = '💡 벽을 클릭하여 평면도에 추가하세요';
+    wallList.appendChild(hint);
+    
     Object.values(walls).forEach(wall => {
         const item = document.createElement('div');
         item.className = 'wall-list-item';
         item.innerHTML = `
-            <strong>${wall.name}</strong>
+            <strong>📋 ${wall.name}</strong>
             <small>${wall.width}×${wall.height}cm, 액자 ${wall.frames.length}개</small>
         `;
         item.onclick = () => addWallToFloorPlan(wall);
+        item.style.cursor = 'pointer';
+        
+        // 호버 효과 강조
+        item.onmouseenter = function() {
+            this.style.transform = 'translateX(5px)';
+            this.style.transition = 'all 0.2s';
+        };
+        item.onmouseleave = function() {
+            this.style.transform = 'translateX(0)';
+        };
+        
         wallList.appendChild(item);
     });
 }
@@ -35,7 +55,8 @@ function addWallToFloorPlan(wallData) {
     
     const floorWall = document.createElement('div');
     floorWall.className = 'floor-wall';
-    floorWall.style.width = (wallData.width * 0.5) + 'px';  // 평면도는 0.5 스케일
+    const wallWidth = wallData.width * 0.5;
+    floorWall.style.width = wallWidth + 'px';  // 평면도는 0.5 스케일
     floorWall.style.height = thickness + 'px';
     floorWall.style.left = '50px';
     floorWall.style.top = '50px';
@@ -47,6 +68,8 @@ function addWallToFloorPlan(wallData) {
     
     floorWall.dataset.wallId = wallData.id;
     floorWall.dataset.rotation = 0;
+    floorWall.dataset.wallWidth = wallWidth;  // 실제 너비 저장
+    floorWall.dataset.wallHeight = thickness;  // 실제 높이 저장
     
     floorWall.addEventListener('mousedown', startDragFloorWall);
     floorWall.addEventListener('click', selectFloorWall);
@@ -56,6 +79,18 @@ function addWallToFloorPlan(wallData) {
     
     canvas.appendChild(floorWall);
     floorWalls.push(floorWall);
+}
+
+// 회전된 요소의 실제 바운딩 박스 크기 계산
+function getRotatedBounds(width, height, rotation) {
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    
+    const rotatedWidth = width * cos + height * sin;
+    const rotatedHeight = width * sin + height * cos;
+    
+    return { width: rotatedWidth, height: rotatedHeight };
 }
 
 function startDragFloorWall(e) {
@@ -237,7 +272,7 @@ document.addEventListener('mousemove', (e) => {
         return;
     }
     
-    // 액자 드래그 (벽 에디터) - 줌/팬 보정
+    // 액자 드래그 (벽 에디터) - 줌/팬 보정 + 가이드라인
     if (dragFrame && !isPanning) {
         const wall = document.getElementById('wall');
         const wallRect = wall.getBoundingClientRect();
@@ -255,6 +290,13 @@ document.addEventListener('mousemove', (e) => {
         
         newX = Math.max(0, Math.min(newX, wallWidth - dragFrame.offsetWidth));
         newY = Math.max(0, Math.min(newY, wallHeight - dragFrame.offsetHeight));
+        
+        // 가이드라인 표시 및 스냅
+        const snapped = showGuideLines(dragFrame, newX, newY);
+        if (snapped) {
+            newX = snapped.x;
+            newY = snapped.y;
+        }
         
         dragFrame.style.left = newX + 'px';
         dragFrame.style.top = newY + 'px';
@@ -281,7 +323,7 @@ document.addEventListener('mousemove', (e) => {
         dragPerson.style.top = newY + 'px';
     }
     
-    // 평면도 벽 드래그 - 줌/팬 보정
+    // 평면도 벽 드래그 - 회전 고려한 경계 체크
     if (dragFloorWall && !isRotating && !isPanning) {
         const canvas = document.getElementById('floorPlanCanvas');
         const canvasRect = canvas.getBoundingClientRect();
@@ -293,12 +335,36 @@ document.addEventListener('mousemove', (e) => {
         let newX = mouseXInCanvas - offsetX;
         let newY = mouseYInCanvas - offsetY;
         
-        // 경계 체크 (변환된 좌표 기준)
+        // 캔버스 크기
         const canvasWidth = canvasRect.width / floorPlanZoom;
         const canvasHeight = canvasRect.height / floorPlanZoom;
         
-        newX = Math.max(0, Math.min(newX, canvasWidth - dragFloorWall.offsetWidth));
-        newY = Math.max(0, Math.min(newY, canvasHeight - dragFloorWall.offsetHeight));
+        // 원본 크기
+        const wallWidth = parseFloat(dragFloorWall.dataset.wallWidth) || dragFloorWall.offsetWidth;
+        const wallHeight = parseFloat(dragFloorWall.dataset.wallHeight) || dragFloorWall.offsetHeight;
+        
+        // 현재 회전 각도
+        const rotation = parseFloat(dragFloorWall.dataset.rotation || 0);
+        
+        // 회전된 바운딩 박스 크기 계산
+        const rotatedBounds = getRotatedBounds(wallWidth, wallHeight, rotation);
+        
+        // 회전 중심을 고려한 경계 체크
+        // 회전 중심은 요소의 중앙이므로, 좌상단 좌표를 기준으로 조정
+        const halfOriginalWidth = wallWidth / 2;
+        const halfOriginalHeight = wallHeight / 2;
+        const halfRotatedWidth = rotatedBounds.width / 2;
+        const halfRotatedHeight = rotatedBounds.height / 2;
+        
+        // 실제 위치 제한 (회전된 바운딩 박스가 캔버스를 벗어나지 않도록)
+        newX = Math.max(
+            halfRotatedWidth - halfOriginalWidth,
+            Math.min(newX, canvasWidth - halfRotatedWidth - halfOriginalWidth)
+        );
+        newY = Math.max(
+            halfRotatedHeight - halfOriginalHeight,
+            Math.min(newY, canvasHeight - halfRotatedHeight - halfOriginalHeight)
+        );
         
         dragFloorWall.style.left = newX + 'px';
         dragFloorWall.style.top = newY + 'px';

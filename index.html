@@ -73,6 +73,45 @@
                     </div>
 
                     <div class="control-section">
+                        <h3>🎯 액자 정렬 및 분배</h3>
+                        <div class="info-item" style="margin-bottom: 10px; font-size: 12px; color: #3498db;">
+                            💡 Ctrl+클릭으로 여러 액자 선택
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;">
+                            <button class="button" style="background: #9b59b6; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('top')">
+                                ⬆️ 상단
+                            </button>
+                            <button class="button" style="background: #9b59b6; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('bottom')">
+                                ⬇️ 하단
+                            </button>
+                            <button class="button" style="background: #9b59b6; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('left')">
+                                ⬅️ 좌측
+                            </button>
+                            <button class="button" style="background: #9b59b6; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('right')">
+                                ➡️ 우측
+                            </button>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;">
+                            <button class="button" style="background: #8e44ad; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('centerX')">
+                                🎯 중앙(가로)
+                            </button>
+                            <button class="button" style="background: #8e44ad; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('centerY')">
+                                🎯 중앙(세로)
+                            </button>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                            <button class="button" style="background: #16a085; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('distributeX')">
+                                ↔️ 가로 분배
+                            </button>
+                            <button class="button" style="background: #16a085; color: white; padding: 8px; font-size: 12px;" onclick="alignFrames('distributeY')">
+                                ↕️ 세로 분배
+                            </button>
+                        </div>
+                    </div>
+                    <div class="control-section">
                         <h3>👤 사람 모형 추가</h3>
                         <div class="control-group">
                             <label>사람 키 (cm)</label>
